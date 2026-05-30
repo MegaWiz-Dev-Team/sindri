@@ -50,23 +50,31 @@ cargo run -- model.onnx image.ubyte     # also run a 28x28 MNIST image
 - [x] **4. Fast CPU GEMM** — `gemm` crate (SIMD/NEON + threads). **22× over
       naive** at 1024³ on M4 Pro (~700 GFLOP/s). See `examples/bench_gemm.rs`.
 - [x] **5. GPU via Metal** — hand-written tiled MSL kernel (`src/metal_gemm.rs`),
-      `storageModeShared` (unified memory = no host↔device copy). Result: GPU
-      *loses to the CPU `gemm` crate* at every size (naive tiled kernel vs a
-      years-tuned microkernel) and is **slower than naive CPU at 128³** (dispatch
-      overhead). Beating `gemm` on-GPU needs MPS, not a hand kernel — the whole
-      point: tuned libraries win.
-- [ ] **6. GPU via MPS** — Apple's `MPSMatrixMultiplication` (the tuned path).
+      `storageModeShared` (unified memory = no host↔device copy). A *naive* GPU
+      kernel: beats naive CPU but loses to the CPU `gemm` crate, and is slower
+      than naive CPU at 128³ (dispatch overhead).
+- [x] **6. GPU via MPS** — Apple's tuned `MPSMatrixMultiplication`
+      (`src/metal_mps.rs`, via raw objc message sends). The only backend that
+      decisively beats the CPU `gemm` crate (3.7× at 2048³) — but the *slowest*
+      of all at 128³ (per-call setup overhead). Tuned ≠ universally fast: it's
+      tuned for large matrices.
 - [ ] **7. Graph optimizations** — operator fusion, parallel branches.
 
-### Benchmark (M4 Pro)
+### Benchmark (M4 Pro, GFLOP/s)
 
 ```
-size    naive      gemm crate (CPU)   Metal GPU (hand kernel)
-─────────────────────────────────────────────────────────────
- 128³   36 GF       58 GF             27 GF   ← GPU slower (overhead)
-1024³   31 GF      700 GF            543 GF
-2048³   32 GF      701 GF            669 GF
+size    naive   gemm crate (CPU)   Metal (hand kernel)   MPS (tuned)
+────────────────────────────────────────────────────────────────────
+ 128³     37          71                  14               4   ← MPS slowest!
+ 512³     32         464                 233             299
+1024³     32         665                 470            1096   ← MPS 1.6× gemm
+2048³     29         602                 689            2225   ← MPS 3.7× gemm
 ```
+
+The lesson in one table: a hand kernel (even on the GPU) loses to a tuned CPU
+library; only a tuned GPU library (MPS) wins — and only at the size it's tuned
+for. Small matrices (≈ a single LLM decode step) are overhead-bound, where the
+fancy backends lose to plain CPU code.
 
 Run: `cargo run --release --example bench_gemm`
 

@@ -36,35 +36,40 @@ fn best_of<F: FnMut() -> Vec<f32>>(reps: u32, mut f: F) -> (std::time::Duration,
 }
 
 #[cfg(target_os = "macos")]
-fn bench(gpu: &sindri::metal_gemm::MetalGemm, m: usize, k: usize, n: usize) {
+fn bench(
+    gpu: &sindri::metal_gemm::MetalGemm,
+    mps: &sindri::metal_mps::MetalMps,
+    m: usize,
+    k: usize,
+    n: usize,
+) {
     let mut seed = 0x1234_5678_9abc_def0;
     let a = rand_vec(m * k, &mut seed);
     let b = rand_vec(k * n, &mut seed);
 
-    // Naive is slow → fewer reps; fast/GPU are quick → more reps for a stable best.
+    // Naive is slow → fewer reps; the rest are quick → more reps for a stable best.
     let (t_naive, c1) = best_of(3, || matmul_naive(&a, &b, m, k, n));
     let (t_fast, _) = best_of(10, || matmul_fast(&a, &b, m, k, n));
-    let (t_gpu, c3) = best_of(10, || gpu.run(&a, &b, m, k, n));
+    let (t_gpu, _) = best_of(10, || gpu.run(&a, &b, m, k, n));
+    let (t_mps, c4) = best_of(10, || mps.run(&a, &b, m, k, n));
 
-    // Correctness: GPU result vs the naive reference.
+    // Correctness: MPS result vs the naive reference.
     let max_diff = c1
         .iter()
-        .zip(&c3)
+        .zip(&c4)
         .map(|(x, y)| (x - y).abs())
         .fold(0.0f32, f32::max);
 
     let flops = 2.0 * m as f64 * k as f64 * n as f64; // multiply-add = 2 flops
     let gf = |d: std::time::Duration| flops / d.as_secs_f64() / 1e9;
-    let ms = |d: std::time::Duration| d.as_secs_f64() * 1e3;
 
     println!(
-        "{:>5}³  naive {:>7.2}ms({:>5.0} GF)  gemm {:>6.2}ms({:>5.0} GF)  metal {:>6.2}ms({:>5.0} GF)  | gemm {:>4.1}×  metal {:>4.1}×  diff {:.0e}",
+        "{:>5}³ | naive {:>5.0} | gemm(CPU) {:>5.0} | metal(hand) {:>5.0} | MPS {:>5.0}  GFLOP/s   (mps diff {:.0e})",
         m,
-        ms(t_naive), gf(t_naive),
-        ms(t_fast), gf(t_fast),
-        ms(t_gpu), gf(t_gpu),
-        t_naive.as_secs_f64() / t_fast.as_secs_f64(),
-        t_naive.as_secs_f64() / t_gpu.as_secs_f64(),
+        gf(t_naive),
+        gf(t_fast),
+        gf(t_gpu),
+        gf(t_mps),
         max_diff,
     );
 }
@@ -72,12 +77,14 @@ fn bench(gpu: &sindri::metal_gemm::MetalGemm, m: usize, k: usize, n: usize) {
 #[cfg(target_os = "macos")]
 fn main() {
     let gpu = sindri::metal_gemm::MetalGemm::new().expect("Metal init failed");
-    println!("GEMM benchmark — naive vs `gemm` crate (CPU SIMD+threads) vs Metal GPU");
+    let mps = sindri::metal_mps::MetalMps::new().expect("MPS init failed");
+    println!("GEMM benchmark — naive CPU vs `gemm` crate (CPU) vs hand Metal kernel vs MPS");
     println!("GPU: {}\n", gpu.device_name());
     // warm up the GPU (first dispatch pays pipeline/shader warmup)
     let _ = gpu.run(&vec![0.0; 64 * 64], &vec![0.0; 64 * 64], 64, 64, 64);
+    let _ = mps.run(&vec![0.0; 64 * 64], &vec![0.0; 64 * 64], 64, 64, 64);
     for n in [128usize, 256, 512, 768, 1024, 2048] {
-        bench(&gpu, n, n, n);
+        bench(&gpu, &mps, n, n, n);
     }
 }
 
