@@ -18,3 +18,8 @@ metal = "0.29"
 
 [build-dependencies]
 prost-build = "0.13"
+
+# The objc 0.2 `msg_send!` macro expands to `cfg(cargo-clippy)` checks that
+# trip the unexpected_cfgs lint. Silence that dependency noise crate-wide.
+[lints.rust]
+unexpected_cfgs = { level = "allow" }

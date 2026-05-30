@@ -9,10 +9,6 @@
 //! This is the "use the tuned library" path: it should beat our hand-written
 //! tiled kernel from milestone 5, and challenge the CPU `gemm` crate.
 
-// The objc 0.2 `msg_send!` macro expands to `cfg(cargo-clippy)` checks that
-// trip the unexpected_cfgs lint — silence that noise (it's not our code).
-#![allow(unexpected_cfgs)]
-
 use std::ffi::c_void;
 
 use metal::foreign_types::{ForeignType, ForeignTypeRef};
