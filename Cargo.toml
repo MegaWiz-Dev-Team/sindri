@@ -11,9 +11,10 @@ prost = "0.13"
 # ── Milestone 4: fast CPU GEMM ──
 gemm = "0.18"             # pure-Rust SIMD + multithread GEMM (NEON on Apple Silicon)
 # accelerate-src = "0.3"  # link Apple's Accelerate BLAS (cblas_sgemm)
-# ── Milestone 5+ (GPU via Metal) ──
-# metal = "0.29"
-# objc2 = "0.5"
+
+# ── Milestone 5: GPU via Metal (macOS only) ──
+[target.'cfg(target_os = "macos")'.dependencies]
+metal = "0.29"
 
 [build-dependencies]
 prost-build = "0.13"

@@ -46,13 +46,29 @@ cargo run -- model.onnx image.ubyte     # also run a 28x28 MNIST image
 - [x] **1. Load** — parse ONNX protobuf, extract weights → `Tensor`
 - [x] **2. Graph + topo sort** — index arena, DFS post-order
 - [x] **3. Inference (correctness)** — 4 naive ops, predict the digit
-- [ ] **4. Fast CPU GEMM** — swap naive loop for the `gemm` crate or Accelerate
-      BLAS (`cblas_sgemm`). Expect tens of × speedup. (deps already stubbed in
-      `Cargo.toml`)
-- [ ] **5. GPU via Metal** — MPS `MPSMatrixMultiplication`, then a hand-written
-      MSL kernel. Use `MTLBuffer` `storageModeShared` (unified memory = no
-      host↔device copy).
-- [ ] **6. Graph optimizations** — operator fusion, parallel branches.
+      (output verified to match PyTorch to ~5 decimal places)
+- [x] **4. Fast CPU GEMM** — `gemm` crate (SIMD/NEON + threads). **22× over
+      naive** at 1024³ on M4 Pro (~700 GFLOP/s). See `examples/bench_gemm.rs`.
+- [x] **5. GPU via Metal** — hand-written tiled MSL kernel (`src/metal_gemm.rs`),
+      `storageModeShared` (unified memory = no host↔device copy). Result: GPU
+      *loses to the CPU `gemm` crate* at every size (naive tiled kernel vs a
+      years-tuned microkernel) and is **slower than naive CPU at 128³** (dispatch
+      overhead). Beating `gemm` on-GPU needs MPS, not a hand kernel — the whole
+      point: tuned libraries win.
+- [ ] **6. GPU via MPS** — Apple's `MPSMatrixMultiplication` (the tuned path).
+- [ ] **7. Graph optimizations** — operator fusion, parallel branches.
+
+### Benchmark (M4 Pro)
+
+```
+size    naive      gemm crate (CPU)   Metal GPU (hand kernel)
+─────────────────────────────────────────────────────────────
+ 128³   36 GF       58 GF             27 GF   ← GPU slower (overhead)
+1024³   31 GF      700 GF            543 GF
+2048³   32 GF      701 GF            669 GF
+```
+
+Run: `cargo run --release --example bench_gemm`
 
 ## Getting a test model (to reach milestone 3)
 
