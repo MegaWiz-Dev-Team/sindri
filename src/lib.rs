@@ -1,0 +1,14 @@
+//! Sindri — a from-scratch ONNX inference engine (library root).
+//! Exposes the engine modules so both the binary (src/main.rs) and
+//! examples/benches can use them.
+
+pub mod graph;
+pub mod infer;
+pub mod onnx_loader;
+pub mod ops;
+pub mod tensor;
+
+// prost-generated ONNX structs (build.rs → $OUT_DIR/onnx.rs, package `onnx`).
+pub mod onnx_proto {
+    include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
+}

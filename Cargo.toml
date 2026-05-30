@@ -1,0 +1,19 @@
+[package]
+name = "sindri"
+version = "0.1.0"
+edition = "2024"
+description = "A from-scratch ONNX inference engine in Rust — learning project (MNIST FFN). Named after the Norse dwarven smith who forged the gods' treasures."
+license = "MIT"
+repository = "https://github.com/MegaWiz-Dev-Team/sindri"
+
+[dependencies]
+prost = "0.13"
+# ── Milestone 4: fast CPU GEMM ──
+gemm = "0.18"             # pure-Rust SIMD + multithread GEMM (NEON on Apple Silicon)
+# accelerate-src = "0.3"  # link Apple's Accelerate BLAS (cblas_sgemm)
+# ── Milestone 5+ (GPU via Metal) ──
+# metal = "0.29"
+# objc2 = "0.5"
+
+[build-dependencies]
+prost-build = "0.13"

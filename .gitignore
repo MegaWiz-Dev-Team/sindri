@@ -1,0 +1,5 @@
+/target
+
+# Generated test artifacts (regenerate with: python gen_model.py)
+/model.onnx
+/image.ubyte
